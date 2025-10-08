@@ -295,6 +295,25 @@ ERROR: City not found: {city_name}
 ```
 **Solution**: Verify city name spelling in CITIES list
 
+### Spark Warnings Explicados y Cómo Mitigarlos
+
+| Warning | Causa | Impacto | Mitigación incluida | Opcional / Extra |
+|---------|-------|---------|---------------------|------------------|
+| `WARNING: Using incubator modules: jdk.incubator.vector` | Estás usando una versión de Java (por ej. 21) donde Spark habilita el módulo vector API incubator | Solo informativo; no afecta correcto funcionamiento | Usa Java 17 LTS (recomendado) si quieres eliminarlo. | Ejecutar con `JAVA_HOME` apuntando a JDK 17. |
+| `Your hostname ... resolves to a loopback address` | El hostname en `/etc/hosts` apunta a 127.0.1.1 | Normal en entornos locales; puede afectar binding de servicios externos | Puedes ignorarlo para uso local. | Exporta `SPARK_LOCAL_IP=127.0.0.1` o corrige `/etc/hosts` si necesitas exponer Spark fuera. |
+| `Unable to load native-hadoop library` | No hay libs nativas Hadoop en tu instalación local | Spark usa clases Java puras (más lento en compresión / IO extremo) | Se puede ignorar para este caso pequeño. | Instalar distribución Hadoop con libs nativas o añadirlas al `LD_LIBRARY_PATH`. |
+| `FileStreamSink: ... staging/raw/*.json` | Lectura usando patrón glob provocaba intento de localizar metadatos streaming | Solo ruido; no era streaming, pero Spark verifica metadatos | Eliminado cambiando a lista explícita de archivos en el código. | N/A |
+| `Using Spark's default log4j profile` | No había archivo `log4j2.properties` custom | Verbosidad por defecto | Añadido `log4j2.properties` en raíz para controlar niveles. | Ajusta niveles editando el archivo. |
+
+#### Resumen de Cambios Aplicados
+- Se modificó `spark_process.py` para pasar la lista explícita de archivos JSON (evita el warning `FileStreamSink`).
+- Se añadió `log4j2.properties` para fijar niveles de log y evitar mensaje de perfil por defecto.
+
+#### Recomendaciones de Entorno
+- Preferir JDK 17 para minimizar warnings de incubator modules.
+- Si deseas eliminar el warning de hostname exporta antes de ejecutar: `export SPARK_LOCAL_IP=127.0.0.1` (no automatizado para cumplir la política del repo).
+- Ignora el warning de native-hadoop salvo que busques máximo rendimiento I/O.
+
 ## 📋 Requirements
 
 See `requirements.txt` for complete dependency list:

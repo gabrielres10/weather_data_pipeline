@@ -1,23 +1,5 @@
-#!/usr/bin/env python3
-"""
-spark_process.py
-Apache Spark job for processing weather data from OpenWeatherMap API.
-
-This script processes raw JSON weather data and performs the following transformations:
-- Converts temperature units (Kelvin to Celsius and Fahrenheit)
-- Extracts relevant fields (city, country, temperature, humidity, pressure, etc.)
-- Adds processing timestamps
-- Calculates comprehensive weather statistics
-- Handles missing or malformed data gracefully
-- Outputs processed data in Parquet format with date partitioning
-- Generates detailed summary reports in JSON format
-
-Requirements: pyspark, pyarrow
-"""
-
 import argparse
 import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from pyspark.sql import SparkSession, functions as F, types as T
@@ -81,17 +63,16 @@ def process_weather_data(spark, input_path, output_path):
     
     # Read JSON files - handle both direct API responses and enhanced format
     try:
-        # Try reading as enhanced format first (with metadata wrapper)
-        df_raw = spark.read.option("multiLine", "true").json(f"{input_path}/*.json")
-        
-        # Check if we have the enhanced format with metadata
+        file_paths = [str(p) for p in json_files]
+        df_raw = spark.read.option("multiLine", "true").json(file_paths)
+
         if "raw_data" in df_raw.columns:
             print("Detected enhanced JSON format with metadata")
             df = df_raw.select("raw_data.*")
         else:
             print("Detected direct API response format")
             df = df_raw
-            
+
     except Exception as e:
         print(f"Error reading JSON files: {e}")
         raise
@@ -182,9 +163,9 @@ def process_weather_data(spark, input_path, output_path):
     print(f"\nWriting processed data to: {parquet_dir}")
     try:
         final_df.write.mode("overwrite").partitionBy("date").parquet(parquet_dir)
-        print("✓ Successfully wrote Parquet files")
+        print("Successfully wrote Parquet files")
     except Exception as e:
-        print(f"✗ Error writing Parquet files: {e}")
+        print(f"Error writing Parquet files: {e}")
         raise
     
     return final_df
@@ -286,10 +267,10 @@ def save_summary(summary_data, summaries_dir):
         with open(summary_file, "w", encoding="utf-8") as f:
             json.dump(summary_data, f, indent=2, ensure_ascii=False)
         
-        print(f"✓ Summary saved to: {summary_file}")
+        print(f"Summary saved to: {summary_file}")
         return str(summary_file)
     except Exception as e:
-        print(f"✗ Error saving summary: {e}")
+        print(f"Error saving summary: {e}")
         raise
 
 def main(args):
@@ -375,7 +356,7 @@ Examples:
     
     try:
         main(args)
-        print("\n🎉 Weather data processing completed successfully!")
+        print("\nWeather data processing completed successfully!")
     except Exception as e:
-        print(f"\n❌ Processing failed: {e}")
+        print(f"\nProcessing failed: {e}")
         exit(1)
