@@ -1,3 +1,17 @@
+"""PostgreSQL load stage for the weather data pipeline.
+
+This module ingests two artifact categories produced by the Spark processing
+stage:
+1. Partitioned Parquet measurement data ("weather_parquet") -> ``weather_raw``
+2. Statistical JSON summary (latest ``summary_*.json``) -> ``daily_weather_summary``
+
+Design principles:
+* Idempotent upsert behaviour (city_name, measurement_time composite key)
+* Batched execution to reduce round trips (500 record chunks)
+* Automatic schema bootstrap (executes bundled SQL if tables absent)
+* Environment / CLI flexible connection provisioning
+"""
+
 import os
 import glob
 import json
@@ -19,6 +33,7 @@ logger = logging.getLogger("loader")
 REQUIRED_TABLES = {"weather_raw", "daily_weather_summary"}
 
 def ensure_schema(conn):
+    """Create required tables if absent (idempotent bootstrap)."""
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -46,6 +61,7 @@ def ensure_schema(conn):
     return True
 
 def infer_connection(args_pg: str | None) -> str:
+    """Resolve PostgreSQL connection string from CLI arg or environment."""
     if args_pg:
         return args_pg
     env_conn = os.getenv("POSTGRES_CONNECTION")
@@ -56,6 +72,7 @@ def infer_connection(args_pg: str | None) -> str:
 
 
 def load_summary_json(conn, summary_file: str):
+    """Load (upsert) daily summary JSON into ``daily_weather_summary``."""
     with open(summary_file, "r", encoding="utf-8") as fh:
         s = json.load(fh)
 
@@ -94,6 +111,7 @@ def load_summary_json(conn, summary_file: str):
 
 
 def load_parquet_weather(conn, parquet_dir: str):
+    """Bulk upsert measurement parquet records into ``weather_raw``."""
     path = Path(parquet_dir)
     if not path.exists():
         logger.warning("Parquet dir %s no existe, omitiendo carga weather_raw", parquet_dir)
@@ -159,6 +177,7 @@ def load_parquet_weather(conn, parquet_dir: str):
     return total
 
 def main():
+    """Command line orchestration for load operations."""
     parser = argparse.ArgumentParser(description="Carga datos procesados y resumen a PostgreSQL")
     parser.add_argument("--pg", help="Cadena conexión Postgres (si no usar POSTGRES_CONNECTION)")
     parser.add_argument("--parquet_dir", default=DEFAULT_PROCESSED_PARQUET, help="Directorio parquet procesado")

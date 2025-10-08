@@ -1,13 +1,27 @@
+"""Spark-based transformation stage for weather ingestion pipeline.
+
+This module reads raw (enhanced or direct) OpenWeatherMap JSON payloads,
+normalises and enriches the records, performs validation / filtering, writes
+partitioned Parquet output, and produces a statistical JSON summary.
+
+Processing steps:
+1. Input discovery & schema inference (supports wrapped `raw_data.*` format)
+2. Field extraction & null coercion
+3. Temperature unit normalisation (heuristic classification, K→°C conversion)
+4. Range / integrity filtering (temperature plausibility, city presence)
+5. Derivation of Fahrenheit + feels-like Celsius
+6. Partitioned Parquet write by measurement date
+7. Aggregated statistics (extremes, distribution, humidity, pressure)
+"""
+
 import argparse
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from pyspark.sql import SparkSession, functions as F, types as T
+from pyspark.sql import SparkSession, functions as F
 
 def build_spark():
-    """
-    Create and configure Spark session for weather data processing.
-    """
+    """Create and configure a SparkSession for batch processing."""
     spark = (SparkSession.builder
              .appName("WeatherDataProcessor")
              .config("spark.sql.adaptive.enabled", "true")
@@ -18,9 +32,7 @@ def build_spark():
     return spark
 
 def validate_input_path(input_path):
-    """
-    Validate that input path exists and contains JSON files.
-    """
+    """Validate presence of JSON source files and return their paths."""
     input_dir = Path(input_path)
     if not input_dir.exists():
         raise FileNotFoundError(f"Input directory does not exist: {input_path}")
@@ -33,9 +45,7 @@ def validate_input_path(input_path):
     return json_files
 
 def create_output_directories(output_path):
-    """
-    Create necessary output directories.
-    """
+    """Ensure output directory tree (parquet + summaries) exists."""
     output_dir = Path(output_path)
     parquet_dir = output_dir / "weather_parquet"
     summaries_dir = output_dir / "summaries"
@@ -46,14 +56,11 @@ def create_output_directories(output_path):
     return str(parquet_dir), str(summaries_dir)
 
 def process_weather_data(spark, input_path, output_path):
-    """
-    Main processing function for weather data.
-    """
+    """Execute extraction, transformation and load of weather observations."""
     print("=" * 60)
     print("Starting Spark weather data processing")
     print("=" * 60)
     
-    # Validate inputs and create outputs
     json_files = validate_input_path(input_path)
     parquet_dir, summaries_dir = create_output_directories(output_path)
     
@@ -61,7 +68,6 @@ def process_weather_data(spark, input_path, output_path):
     print(f"Output path: {output_path}")
     print(f"Processing {len(json_files)} files")
     
-    # Read JSON files - handle both direct API responses and enhanced format
     try:
         file_paths = [str(p) for p in json_files]
         df_raw = spark.read.option("multiLine", "true").json(file_paths)
@@ -79,11 +85,9 @@ def process_weather_data(spark, input_path, output_path):
     
     print(f"Initial records read: {df.count()}")
     
-    # Show schema for debugging
     print("\nData schema:")
     df.printSchema()
     
-    # Extract and transform data with comprehensive error handling
     processed = df.select(
         # City information
         F.coalesce(F.col("name"), F.lit("unknown")).alias("city_name"),
@@ -106,8 +110,6 @@ def process_weather_data(spark, input_path, output_path):
         F.current_timestamp().alias("processing_time")
     )
     
-    # Data quality checks and temperature conversion
-    # OpenWeatherMap returns Celsius when units=metric, Kelvin by default
     processed = processed.withColumn(
         "is_celsius", 
         F.when(F.col("temp_raw") < 100, True).otherwise(False)  # Heuristic: < 100 likely Celsius
@@ -127,7 +129,6 @@ def process_weather_data(spark, input_path, output_path):
          .otherwise(F.round(F.col("feels_like_raw") - 273.15, 2))
     )
     
-    # Data quality filtering
     valid_data = processed.filter(
         (F.col("temperature_celsius").isNotNull()) &
         (F.col("temperature_celsius") > -100) &  # Reasonable temperature range
@@ -141,7 +142,6 @@ def process_weather_data(spark, input_path, output_path):
     
     print(f"Valid records for processing: {valid_data.count()}")
     
-    # Select final columns
     final_df = valid_data.select(
         "city_name", 
         "country_code", 
@@ -156,10 +156,8 @@ def process_weather_data(spark, input_path, output_path):
         "processing_time"
     )
     
-    # Add date partition column
     final_df = final_df.withColumn("date", F.to_date("measurement_time"))
     
-    # Write processed data to Parquet
     print(f"\nWriting processed data to: {parquet_dir}")
     try:
         final_df.write.mode("overwrite").partitionBy("date").parquet(parquet_dir)
@@ -171,9 +169,7 @@ def process_weather_data(spark, input_path, output_path):
     return final_df
 
 def calculate_statistics(df):
-    """
-    Calculate comprehensive weather statistics.
-    """
+    """Compute aggregated descriptive statistics for processed dataset."""
     print("\nCalculating weather statistics...")
     
     # Basic temperature statistics
@@ -257,9 +253,7 @@ def calculate_statistics(df):
     }
 
 def save_summary(summary_data, summaries_dir):
-    """
-    Save processing summary to JSON file.
-    """
+    """Persist JSON summary artifact with run‑level statistics."""
     timestamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     summary_file = Path(summaries_dir) / f"summary_{timestamp}.json"
     
@@ -274,9 +268,7 @@ def save_summary(summary_data, summaries_dir):
         raise
 
 def main(args):
-    """
-    Main processing pipeline.
-    """
+    """CLI entry point: orchestrate Spark processing & summary generation."""
     spark = build_spark()
     
     try:

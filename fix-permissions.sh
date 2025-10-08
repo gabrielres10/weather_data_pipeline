@@ -1,23 +1,24 @@
 #!/bin/bash
 # fix-permissions.sh
-# Script para corregir permisos después de levantar Docker Compose
+# Purpose: Ensure the current user and the Airflow service user share read/write/execute access
+# to project directories (DAGs, logs, staging) by aligning ownership and group permissions.
 
-echo "Configurando permisos para Airflow..."
+echo "Setting shared permissions..."
 
-# Permisos para staging (datos del pipeline)
-sudo chown -R 50000:0 staging/
-sudo chmod -R 755 staging/
+PROJECT_DIR="$(dirname "$0")/.." 
+AIRFLOW_GROUP="airflow"
 
-# Permisos para logs de Airflow
-sudo chown -R 50000:0 logs/
-sudo chmod -R 755 logs/
+# Create the group if it does not exist and add current user
+sudo groupadd -f "$AIRFLOW_GROUP"
+sudo usermod -aG "$AIRFLOW_GROUP" "$USER"
 
-# Mantener permisos de edición para el usuario local en dags
-sudo chown -R $USER:$USER dags/
-sudo chmod -R 755 dags/
+# Recursive ownership and group-writable (775) so Airflow containers (same GID) can write
+sudo chown -R "$USER:$AIRFLOW_GROUP" "$PROJECT_DIR"
+sudo chmod -R 775 "$PROJECT_DIR"
 
-echo "✅ Permisos configurados correctamente"
-echo "🎯 staging/ y logs/ → Airflow (50000:0)"  
-echo "📝 dags/ → Usuario local ($USER)"
-echo ""
-echo "Ahora puedes ejecutar el DAG sin problemas de permisos"
+# Apply the setgid bit so new files inherit the group
+sudo find "$PROJECT_DIR" -type d -exec chmod g+s {} \;
+
+echo "Permissions configured:"
+echo "Owner user: $USER | Group: $AIRFLOW_GROUP"
+echo "Both the current user and Airflow processes can read/write DAGs and logs."

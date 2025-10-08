@@ -1,20 +1,16 @@
-"""
-Weather Data Pipeline DAG
-=========================
+"""Airflow DAG: End‑to‑End Weather Data Pipeline.
 
-Este DAG orquesta el pipeline completo de datos meteorológicos:
-1. Verifica disponibilidad de la API
-2. Extrae datos meteorológicos de OpenWeatherMap
-3. Procesa datos con Apache Spark
-4. Carga datos a PostgreSQL
-5. Genera resumen estadístico diario
-6. Ejecuta validaciones de calidad de datos
+Orchestrates the full workflow:
+1. API availability check
+2. Weather data extraction (raw JSON staging)
+3. Spark transformation & Parquet generation
+4. Load into PostgreSQL (raw + daily aggregates)
+5. Daily summary export (JSON)
+6. Data quality validation (completeness & sanity rules)
 
-Configuración:
-- Se ejecuta diariamente a las 6:00 AM UTC
-- Incluye reintentos con backoff exponencial
-- Envía alertas por email en caso de fallos
-- Maneja dependencias entre tareas apropiadamente
+Schedule: Daily at 06:00 UTC (non‑catchup, single active run)
+Resilience: Retries with fixed delay and bounded max retry window
+Observability: Structured Python logging and task return metadata
 """
 
 import os
@@ -23,14 +19,12 @@ import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Airflow imports - válidos en el entorno Docker de Airflow
 from airflow import DAG
 from airflow.operators.python import PythonOperator  # type: ignore
 from airflow.providers.postgres.hooks.postgres import PostgresHook  # type: ignore
 from airflow.exceptions import AirflowException  # type: ignore
 import requests
 
-# Configuración del DAG
 DEFAULT_ARGS = {
     'owner': 'weather-team',
     'depends_on_past': False,
@@ -44,15 +38,12 @@ DEFAULT_ARGS = {
     'max_retry_delay': timedelta(minutes=30),
 }
 
-# Paths dentro del contenedor Airflow
 SCRIPTS_DIR = "/opt/airflow/dags/scripts"
 STAGING_DIR = "/opt/airflow/staging"
 LOGS_DIR = "/opt/airflow/logs"
 
 def check_api_availability(**context):
-    """
-    Verifica que la API de OpenWeatherMap sea accesible.
-    """
+    """Validate OpenWeatherMap API reachability and basic response integrity."""
     api_key = os.getenv("OPENWEATHERMAP_API_KEY")
     if not api_key or api_key == "your_api_key_here":
         raise AirflowException("API key no configurada correctamente")
@@ -76,9 +67,7 @@ def check_api_availability(**context):
         raise AirflowException(f"API no disponible: {e}")
 
 def extract_weather_data(**context):
-    """
-    Ejecuta el script de extracción de datos meteorológicos.
-    """
+    """Invoke extraction script; verify expected raw artifact generation."""
     import subprocess
     import sys
     
@@ -117,9 +106,7 @@ def extract_weather_data(**context):
         raise AirflowException("Timeout en script de extracción")
 
 def process_with_spark(**context):
-    """
-    Ejecuta el procesamiento de datos con Apache Spark.
-    """
+    """Execute Spark transformation script and assert output directories exist."""
     import subprocess
     import sys
     
@@ -157,9 +144,7 @@ def process_with_spark(**context):
         raise AirflowException("Timeout en procesamiento Spark")
 
 def load_to_postgres(**context):
-    """
-    Carga los datos procesados a PostgreSQL.
-    """
+    """Load processed Parquet data and summaries into PostgreSQL."""
     import subprocess
     import sys
     
@@ -189,9 +174,7 @@ def load_to_postgres(**context):
         raise AirflowException("Timeout en carga a Postgres")
 
 def generate_summary(**context):
-    """
-    Genera resumen estadístico adicional y métricas de calidad.
-    """
+    """Produce derived daily statistical JSON summary from persisted records."""
     hook = PostgresHook(postgres_conn_id="postgres")
     
     # Query para estadísticas del día actual
@@ -242,9 +225,7 @@ def generate_summary(**context):
         raise AirflowException(f"Error generando resumen: {e}")
 
 def data_quality_check(**context):
-    """
-    Valida la calidad y completitud de los datos cargados.
-    """
+    """Run rule‑based quality validations against the loaded dataset."""
     hook = PostgresHook(postgres_conn_id="postgres")
     date_filter = context['ds']
     
@@ -320,14 +301,13 @@ def data_quality_check(**context):
 dag = DAG(
     'weather_data_pipeline',
     default_args=DEFAULT_ARGS,
-    description='Pipeline completo de datos meteorológicos con Spark y PostgreSQL',
-    schedule='0 6 * * *',  # Diario a las 6:00 AM UTC - Airflow 3.0+ usa 'schedule' en lugar de 'schedule_interval'
+    description='Daily weather ingestion and transformation pipeline (Spark + PostgreSQL)',
+    schedule='0 6 * * *',
     catchup=False,
     max_active_runs=1,
     tags=['weather', 'etl', 'spark', 'postgres']
 )
 
-# Definición de tareas
 check_api_task = PythonOperator(
     task_id='check_api_availability',
     python_callable=check_api_availability,
@@ -364,7 +344,5 @@ quality_task = PythonOperator(
     dag=dag,
 )
 
-# Definición de dependencias
 check_api_task >> extract_task >> process_task >> load_task >> [summary_task, quality_task]
-
-# Las tareas de resumen y calidad pueden ejecutarse en paralelo después de la carga
+check_api_task >> extract_task >> process_task >> load_task >> [summary_task, quality_task]

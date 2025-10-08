@@ -1,3 +1,23 @@
+"""Weather data extraction script.
+
+This module retrieves current weather observations for a configured list of
+cities from the OpenWeatherMap API and stores them as enriched JSON documents
+in the raw staging area. Each persisted file contains both the unmodified API
+payload (under ``raw_data``) and a metadata envelope with basic provenance
+attributes (timestamp, endpoint, file version, city name).
+
+Key features:
+* Resilient network access with exponential backoff (``tenacity``)
+* Structured logging (rotated daily) + concise colored console output
+* Per‑city success / failure accounting and final extraction summary file
+* Filename normalisation for portability (ASCII substitutions for accents)
+
+Exit codes:
+0  – All cities extracted successfully
+1  – At least one city failed, or an unrecoverable error occurred
+130 – User interrupted (SIGINT)
+"""
+
 import os
 import json
 import logging
@@ -19,17 +39,15 @@ CITIES = [
     {"name": "São Paulo", "country": "BR"},
 ]
 
-# staging dir for raw json
 STAGING_DIR = Path("staging/raw")
 STAGING_DIR.mkdir(parents=True, exist_ok=True)
 
-# logging configuration
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
 
 # Create a custom formatter
 class ColoredFormatter(logging.Formatter):
-    """Custom formatter to add colors to console output"""
+    """Minimal colorised console formatter for human readability."""
     
     grey = "\x1b[38;21m"
     blue = "\x1b[34m"
@@ -51,14 +69,11 @@ class ColoredFormatter(logging.Formatter):
         formatter = logging.Formatter(log_fmt, datefmt="%Y-%m-%d %H:%M:%S")
         return formatter.format(record)
 
-# Configure root logger
 logging.basicConfig(level=logging.DEBUG, handlers=[])
 
-# Create logger
 logger = logging.getLogger("extract_weather")
 logger.setLevel(logging.DEBUG)
 
-# Create file handler with detailed logging
 log_filename = LOG_DIR / f"extract_weather_{datetime.now(timezone.utc).strftime('%Y%m%d')}.log"
 file_handler = logging.FileHandler(log_filename, encoding='utf-8')
 file_handler.setLevel(logging.DEBUG)
@@ -68,39 +83,43 @@ file_format = logging.Formatter(
 )
 file_handler.setFormatter(file_format)
 
-# Create console handler with colored output
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
 console_handler.setFormatter(ColoredFormatter())
 
-# Add handlers to logger
 logger.addHandler(file_handler)
 logger.addHandler(console_handler)
 
-# Suppress urllib3 debug logs
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 
 class APIError(Exception):
-    pass
+    """Domain specific exception for API level failures."""
 
 
 @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=2, max=30),
        retry=retry_if_exception_type((requests.RequestException, APIError)))
 def fetch_city_weather(city_name: str, country_code: str) -> dict:
-    """
-    Fetch current weather data for a specific city from OpenWeatherMap API.
-    
-    Args:
-        city_name: Name of the city
-        country_code: ISO country code (e.g., 'US', 'GB')
-    
-    Returns:
-        dict: JSON response from the API
-    
-    Raises:
-        APIError: When API returns non-200 status code
-        requests.RequestException: For network-related errors
+    """Retrieve current conditions for a single city.
+
+    Parameters
+    ----------
+    city_name : str
+        Human‑readable city name.
+    country_code : str
+        ISO 3166‑1 alpha‑2 country code.
+
+    Returns
+    -------
+    dict
+        Parsed JSON payload returned by the OpenWeatherMap API.
+
+    Raises
+    ------
+    APIError
+        For application‑level (non‑successful) HTTP responses.
+    requests.RequestException
+        For transport / network related failures.
     """
     params = {
         "q": f"{city_name},{country_code}",
@@ -140,12 +159,9 @@ def fetch_city_weather(city_name: str, country_code: str) -> dict:
 
 
 def save_raw_json(city_name: str, data: dict):
-    """
-    Save raw JSON weather data to staging directory.
-    
-    Args:
-        city_name: Name of the city
-        data: Raw JSON data from API
+    """Persist enriched raw JSON document for a city.
+
+    The file embeds provenance metadata and the original API response.
     """
     now = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     # Clean city name for filename (handle special characters)
@@ -183,9 +199,7 @@ def save_raw_json(city_name: str, data: dict):
 
 
 def main():
-    """
-    Main function to extract weather data for all cities.
-    """
+    """Orchestrate end‑to‑end extraction for the configured city list."""
     logger.info("=" * 60)
     logger.info("Starting weather data extraction process")
     logger.info("=" * 60)
