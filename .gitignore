@@ -1,3 +1,13 @@
 # ignore .env files
 .env
 
+# exclude venv
+venv/
+__pycache__/
+*.pyc
+
+# exclude logs
+logs/
+
+# exclude generated files
+staging/
