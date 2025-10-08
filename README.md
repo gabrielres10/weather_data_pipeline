@@ -1,169 +1,186 @@
 # Weather Data Pipeline
 
-A complete weather data ETL pipeline that extracts data from OpenWeatherMap API, processes it with Apache Spark, stores it in PostgreSQL, and orchestrates everything with Apache Airflow - all running in Docker containers.
+A comprehensive ETL (Extract, Transform, Load) pipeline implementation that demonstrates modern data engineering practices. The system extracts me## Troubleshooting and Diagnostics
 
-## 🚀 Quick Start (5 minutes)
+### Common Issues and Resolutions
 
-### Prerequisites
-**Only 2 things you need:**
-1. **Docker & Docker Compose** installed on your machine
-2. **Free OpenWeatherMap API key** (get it [here](https://openweathermap.org/api))
+| Issue Category | Error Symptoms | Recommended Solution |
+|-------|----------|----------|
+| **Authentication** | `OPENWEATHERMAP_API_KEY is not configured properly` | Verify `.env` file contains valid API key configuration |
+| **File System Permissions** | `Permission denied: staging/raw/` | Execute `./fix-permissions.sh` to configure container access |
+| **Container Build Process** | Java/Spark installation failures | Allocate minimum 4GB memory to Docker daemon |
+| **Service Initialization** | Containers in restart loop | Examine service logs using `docker-compose logs` |
+| **DAG Registration** | Pipeline absent from Airflow interface | Allow 30-second delay for DAG processor file scanning |
+| **Task Execution** | Task failure indicators in interface | Access detailed error logs through task-specific log viewer | data from the OpenWeatherMap API, processes it using Apache Spark for scalable data transformation, stores results in PostgreSQL for persistent storage, and orchestrates the entire workflow using Apache Airflow within a containerized Docker environment.
 
-### Step 1: Clone and Setup
+## Quick Start Guide
+
+### System Requirements
+The following prerequisites are required for deployment:
+1. **Docker Engine and Docker Compose** - Container orchestration platform
+2. **OpenWeatherMap API Key** - Free registration available at https://openweathermap.org/api
+
+### Installation and Configuration
+
+**Step 1: Repository Setup**
 ```bash
 git clone https://github.com/gabrielres10/weather_data_pipeline.git
 cd weather_data_pipeline
 ```
 
-### Step 2: Configure API Key
+**Step 2: Environment Configuration**
 ```bash
-# Create .env file with your API key
+# Configure environment variables
 echo "OPENWEATHERMAP_API_KEY=your_api_key_here" > .env
 ```
-> Replace `your_api_key_here` with your actual API key from OpenWeatherMap
+Note: Replace `your_api_key_here` with your registered OpenWeatherMap API key.
 
-### Step 3: Start Everything
+**Step 3: Container Deployment**
 ```bash
-# Build and start all services (this will take a few minutes the first time)
+# Build custom Docker images and initialize services
 docker-compose build
 docker-compose up -d
 
-# Fix file permissions for Docker
+# Configure file system permissions for container access
 chmod +x fix-permissions.sh
 ./fix-permissions.sh
 ```
 
-### Step 4: Access Airflow and Run Pipeline
-1. **Open Airflow UI**: http://localhost:8080
-2. **Login**: 
+**Step 4: Pipeline Execution**
+1. Access the Airflow web interface at http://localhost:8080
+2. Authenticate using the default credentials:
    - Username: `airflow`
    - Password: `airflow`
-3. **Find the DAG**: Look for `weather_data_pipeline` in the DAGs list
-4. **Run it**: Click the "Trigger DAG" button ▶️
+3. Locate the `weather_data_pipeline` DAG in the interface
+4. Execute the pipeline by triggering the DAG manually
 
-**That's it!** The complete pipeline will run automatically.
+The system will execute the complete data processing workflow automatically.
 
-## 🎯 What the Pipeline Does
+## Pipeline Architecture and Functionality
 
-### Architecture Overview
+### System Architecture
 ```
-OpenWeatherMap API → Spark Processing → PostgreSQL → Data Quality Checks
+OpenWeatherMap API → Spark Processing → PostgreSQL → Data Quality Validation
       ↓                    ↓               ↓              ↓
    Raw JSON          Parquet Files    Structured DB   Validation Reports
 ```
 
-### Pipeline Steps (All Automated)
-1. **🌐 API Check**: Validates OpenWeatherMap API access
-2. **📥 Data Extraction**: Fetches weather for 5 cities (NYC, London, Tokyo, Sydney, São Paulo)
-3. **⚡ Spark Processing**: Transforms data with PySpark (includes Java 17 + Spark 3.5)
-4. **💾 PostgreSQL Load**: Stores processed data with upsert logic
-5. **📊 Summary Generation**: Creates daily statistics and reports
-6. **✅ Quality Validation**: Checks data completeness and accuracy
+### Workflow Components
+The pipeline implements a six-stage automated workflow:
 
-### What You Get
-- **Scheduled Runs**: Daily at 6 AM UTC (configurable)
-- **Real-time Monitoring**: Airflow UI shows all task statuses
-- **Data Storage**: PostgreSQL with raw weather data + daily summaries
-- **Error Handling**: Automatic retries and detailed logging
-- **Data Quality**: Built-in validation checks
+1. **API Connectivity Validation**: Verifies OpenWeatherMap API accessibility and authentication
+2. **Data Extraction**: Retrieves current meteorological data for five major metropolitan areas (New York, London, Tokyo, Sydney, São Paulo)
+3. **Data Processing**: Transforms raw JSON data using Apache Spark with PySpark interface (Java 17 runtime with Spark 3.5)
+4. **Data Persistence**: Loads processed data into PostgreSQL using upsert operations for data consistency
+5. **Statistical Analysis**: Generates daily aggregated summaries and statistical reports
+6. **Quality Assurance**: Performs automated data validation and completeness verification
 
-## �️ Technical Stack
+### System Capabilities
+- **Automated Scheduling**: Configurable execution schedule (default: daily at 06:00 UTC)
+- **Monitoring Infrastructure**: Real-time task monitoring through Airflow web interface
+- **Data Storage**: Dual-layer storage with raw data preservation and structured analytical tables
+- **Error Recovery**: Comprehensive retry mechanisms with exponential backoff strategies
+- **Data Quality Management**: Built-in validation framework with configurable thresholds
 
-- **🐍 Python 3.12**: Core language
-- **⚡ Apache Spark 3.5**: Data processing (with Java 17)
-- **🗄️ PostgreSQL 13**: Data storage
-- **🌬️ Apache Airflow 3.0**: Workflow orchestration
-- **🐳 Docker Compose**: Container orchestration
-- **🌤️ OpenWeatherMap API**: Weather data source
+## Technology Stack
 
-## �📁 Project Structure
+The system utilizes the following technologies and frameworks:
+
+- **Python 3.12**: Primary development language for all pipeline components
+- **Apache Spark 3.5**: Distributed data processing engine with Java 17 runtime environment
+- **PostgreSQL 13**: Relational database management system for structured data storage
+- **Apache Airflow 3.0**: Workflow orchestration and scheduling platform
+- **Docker Compose**: Container orchestration for multi-service deployment
+- **OpenWeatherMap API**: External data source for meteorological information
+
+## Project Structure
 
 ```
 weather_data_pipeline/
-├── 🐳 docker-compose.yaml     # Container orchestration
-├── 🐳 Dockerfile             # Custom Airflow image with Java
-├── 🔧 fix-permissions.sh     # Docker permission fix script
-├── 🌍 .env                   # Environment variables (you create this)
-├── 📊 db_setup.sql           # Database schema setup
-├── 📋 requirements.txt       # Python dependencies
-├── 🗂️ dags/                  # Airflow DAGs
+├── docker-compose.yaml     # Container orchestration
+├── Dockerfile             # Custom Airflow image with Java
+├── fix-permissions.sh     # Docker permission fix script
+├── .env                   # Environment variables (you create this)
+├── db_setup.sql           # Database schema setup
+├── requirements.txt       # Python dependencies
+├── dags/                  # Airflow DAGs
 │   ├── weather_pipeline_dag.py    # Main orchestration DAG
 │   └── scripts/              # Pipeline scripts
 │       ├── extract_weather.py     # Data extraction
 │       ├── spark_process.py       # Spark processing
 │       └── load_to_postgres.py    # Database loading
-├── 📁 staging/               # Data storage (auto-created)
+├── staging/               # Data storage (auto-created)
 │   ├── raw/                  # Raw JSON from API
 │   └── processed/            # Parquet files + summaries
-├── 📝 logs/                  # Application logs (auto-created)
-└── 📖 README.md              # This guide
+├── logs/                  # Application logs (auto-created)
+└── README.md              # This guide
 ```
 
-## � Data Flow & Output
+## Data Flow and Output Structure
 
-### Raw Data (Extraction)
+### Raw Data Extraction Layer
 ```bash
 staging/raw/
-├── New_York_20251008T120000Z.json     # NYC weather data
-├── London_20251008T120000Z.json       # London weather data
-├── Tokyo_20251008T120000Z.json        # Tokyo weather data
-├── Sydney_20251008T120000Z.json       # Sydney weather data
-├── Sao_Paulo_20251008T120000Z.json    # São Paulo weather data
-└── extraction_summary_20251008T120000Z.json  # Extraction metadata
+├── New_York_20251008T120000Z.json     # New York meteorological data
+├── London_20251008T120000Z.json       # London meteorological data
+├── Tokyo_20251008T120000Z.json        # Tokyo meteorological data
+├── Sydney_20251008T120000Z.json       # Sydney meteorological data
+├── Sao_Paulo_20251008T120000Z.json    # São Paulo meteorological data
+└── extraction_summary_20251008T120000Z.json  # Extraction process metadata
 ```
 
-### Processed Data (Spark)
+### Processed Data Transformation Layer
 ```bash
 staging/processed/
-├── weather_parquet/          # Columnar data for analytics
+├── weather_parquet/          # Columnar storage format for analytical queries
 │   └── measurement_date=2025-10-08/
 │       └── part-00000.parquet
-└── summaries/                # Daily statistics
+└── summaries/                # Aggregated statistical summaries
     └── daily_summary_2025-10-08.json
 ```
 
-### Database Tables (PostgreSQL)
+### Database Schema (PostgreSQL)
 ```sql
--- Raw weather measurements
+-- Primary weather measurements table
 weatherdb.weather_raw (
     id, city_name, country, temperature_celsius, 
     humidity, pressure, weather_description, measurement_time
 )
 
--- Daily aggregated summaries  
+-- Aggregated daily summary table  
 weatherdb.daily_weather_summary (
     date, avg_temp_celsius, min_temp_celsius, max_temp_celsius,
     avg_humidity, avg_pressure, total_measurements
 )
 ```
 
-## 🔧 Advanced Configuration
+## Advanced Configuration
 
-### Custom Environment Variables (.env)
+### Environment Variable Configuration (.env)
 ```bash
-# Required
+# Required Configuration
 OPENWEATHERMAP_API_KEY=your_key_here
 
-# Optional Overrides
+# Optional System Overrides
 POSTGRES_HOST=postgres
 POSTGRES_DB=weatherdb
 LOG_LEVEL=INFO
 AIRFLOW_UID=50000
 ```
 
-### Custom Docker Setup
+### Container Management Commands
 ```bash
-# Rebuild after changes
+# Rebuild containers after configuration changes
 docker-compose build --no-cache
 
-# View logs
+# Monitor service logs in real-time
 docker-compose logs -f airflow-scheduler
 
-# Connect to database directly
+# Direct database access for administrative tasks
 docker exec -it weather_data_pipeline-postgres-1 psql -U airflow -d weatherdb
 ```
 
-## � Troubleshooting
+## Troubleshooting
 
 ### Common Issues & Solutions
 
@@ -176,113 +193,113 @@ docker exec -it weather_data_pipeline-postgres-1 psql -U airflow -d weatherdb
 | **DAG Not Visible** | Pipeline doesn't appear in Airflow | Wait 30s for DAG processor to scan files |
 | **Tasks Failing** | Red task boxes in Airflow | Click task → View Logs for detailed error |
 
-### Health Checks
+### System Health Verification
 ```bash
-# Check all services are running
+# Verify container service status
 docker-compose ps
 
-# View real-time logs
+# Monitor application logs continuously
 docker-compose logs -f
 
-# Test database connection
+# Validate database connectivity and data presence
 docker exec weather_data_pipeline-postgres-1 psql -U airflow -d weatherdb -c "SELECT COUNT(*) FROM weather_raw;"
 
-# Test Spark with Java
-docker exec weather_data_pipeline-airflow-scheduler-1 python -c "from pyspark.sql import SparkSession; print('✅ Spark OK')"
+# Confirm Spark framework initialization
+docker exec weather_data_pipeline-airflow-scheduler-1 python -c "from pyspark.sql import SparkSession; print('Spark Framework Operational')"
 ```
 
-### Performance Tuning
+### Performance Optimization
 ```bash
-# For low-memory systems, reduce Spark resources
+# Resource allocation for memory-constrained environments
 export SPARK_DRIVER_MEMORY=1g
 export SPARK_EXECUTOR_MEMORY=1g
 
-# For faster builds, use Docker BuildKit
+# Enable Docker BuildKit for improved build performance
 export DOCKER_BUILDKIT=1
 docker-compose build
 ```
 
-### Manual Development Mode (Optional)
+### Development Environment Setup (Alternative)
 
-If you prefer running scripts individually without Docker:
+For local development without containerization:
 
-**Prerequisites:**
-- Python 3.9+
-- Java 17+ (for Spark)
-- PostgreSQL running locally
+**System Requirements:**
+- Python 3.9 or higher
+- Java Development Kit 17 or higher (required for Spark operations)
+- PostgreSQL database server (local installation)
 
-**Setup:**
+**Environment Configuration:**
 ```bash
-# Install Python dependencies
+# Install Python package dependencies
 pip install -r requirements.txt
 
-# Set up database
+# Initialize database schema
 psql -U postgres -c "CREATE DATABASE weatherdb;"
 psql -U postgres -d weatherdb -f db_setup.sql
 
-# Configure environment
+# Configure runtime environment variables
 export OPENWEATHERMAP_API_KEY=your_key_here
 export POSTGRES_CONNECTION="postgresql://postgres:password@localhost:5432/weatherdb"
 ```
 
-**Run individual scripts:**
+**Individual Component Execution:**
 ```bash
-# Extract weather data
+# Execute data extraction module
 python dags/scripts/extract_weather.py
 
-# Process with Spark  
+# Execute Spark data processing module
 python dags/scripts/spark_process.py
 
-# Load to database
+# Execute database persistence module
 python dags/scripts/load_to_postgres.py
 ```
 
-## 📈 Monitoring & Analytics
+## Monitoring and Data Analysis
 
-### Airflow UI Features
-- **Graph View**: Visual pipeline dependencies  
-- **Tree View**: Historical run status
-- **Gantt Chart**: Task timing analysis
-- **Task Logs**: Detailed execution logs
-- **Variables**: Runtime configuration
+### Airflow Interface Capabilities
+- **Graph View**: Visual representation of task dependencies and workflow structure
+- **Tree View**: Historical execution status across multiple pipeline runs
+- **Gantt Chart**: Temporal analysis of task execution duration and scheduling
+- **Task Logs**: Comprehensive logging output for individual task troubleshooting
+- **Variables**: Runtime configuration management and parameter adjustment
 
-### Database Queries
+### Database Query Examples
 ```sql
--- Check latest data
+-- Retrieve most recent meteorological measurements
 SELECT city_name, temperature_celsius, measurement_time 
 FROM weather_raw 
 ORDER BY measurement_time DESC LIMIT 10;
 
--- Daily averages
+-- Access daily aggregated statistics
 SELECT date, avg_temp_celsius, total_measurements 
 FROM daily_weather_summary 
 ORDER BY date DESC;
 
--- Temperature trends
+-- Analyze temperature trends across cities
 SELECT city_name, AVG(temperature_celsius) as avg_temp
 FROM weather_raw 
 WHERE measurement_time >= NOW() - INTERVAL '7 days'
 GROUP BY city_name;
 ```
 
-### Data Analysis
+### Programmatic Data Analysis
 ```python
-# Connect with pandas
+# Establish database connection using pandas and psycopg
 import pandas as pd
 import psycopg
 
-conn = psycopg.connect("postgresql://airflow:airflow@localhost:5432/weatherdb")
-df = pd.read_sql("SELECT * FROM weather_raw", conn)
+connection = psycopg.connect("postgresql://airflow:airflow@localhost:5432/weatherdb")
+dataframe = pd.read_sql("SELECT * FROM weather_raw", connection)
 
-# Quick analysis
-print(df.describe())
-print(df.groupby('city_name')['temperature_celsius'].mean())
+# Generate descriptive statistics
+print(dataframe.describe())
+print(dataframe.groupby('city_name')['temperature_celsius'].mean())
 ```
 
-## 🔧 Customization
+## System Customization
 
-### Add More Cities
-Edit `dags/scripts/extract_weather.py`:
+### Expanding Geographic Coverage
+Modify the city configuration in `dags/scripts/extract_weather.py`:
 ```python
 CITIES = [
     "New York,US",
@@ -290,26 +307,26 @@ CITIES = [
     "Tokyo,JP",
     "Sydney,AU",
     "Sao Paulo,BR",
-    "Paris,FR",        # Add more cities
+    "Paris,FR",        # Additional metropolitan areas
     "Berlin,DE"
 ]
 ```
 
-### Change Schedule
-Edit `dags/weather_pipeline_dag.py`:
+### Schedule Configuration
+Adjust execution frequency in `dags/weather_pipeline_dag.py`:
 ```python
 dag = DAG(
     'weather_data_pipeline',
-    schedule='0 12 * * *',  # Change to run at noon UTC
-    # schedule='@hourly',   # Or run every hour
+    schedule='0 12 * * *',  # Modified to execute at noon UTC
+    # schedule='@hourly',   # Alternative: hourly execution
     ...
 )
 ```
 
-### Modify Data Processing
-Edit `dags/scripts/spark_process.py` to add custom transformations:
+### Data Transformation Extensions
+Enhance Spark processing in `dags/scripts/spark_process.py`:
 ```python
-# Example: Add temperature categories
+# Implementation example: Temperature classification system
 df_with_categories = df.withColumn(
     "temp_category",
     when(col("temperature_celsius") < 0, "freezing")
@@ -318,9 +335,9 @@ df_with_categories = df.withColumn(
 )
 ```
 
-## 🏗️ Architecture Deep Dive
+## Architecture Design
 
-### Container Architecture
+### Container Service Architecture
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Airflow       │    │   PostgreSQL     │    │   Data          │
@@ -337,81 +354,81 @@ df_with_categories = df.withColumn(
 └─────────────────┘    └──────────────────┘
 ```
 
-### Data Flow Details
-1. **API Extraction** → Raw JSON files with timestamps
-2. **Spark Processing** → Schema validation + transformations
-3. **Parquet Storage** → Columnar format with date partitioning
-4. **PostgreSQL Load** → Structured tables with upsert logic
-5. **Quality Checks** → Data validation and alerting
+### Data Processing Workflow
+1. **API Data Extraction** → Timestamped JSON file generation
+2. **Spark Data Processing** → Schema validation and data transformation
+3. **Parquet File Storage** → Columnar format with temporal partitioning
+4. **PostgreSQL Data Loading** → Structured table population with upsert operations
+5. **Data Quality Validation** → Completeness verification and anomaly detection
 
-## 📚 Learning Resources
+## Technical References
 
-### Understanding the Technologies
-- **Airflow**: [Official Tutorial](https://airflow.apache.org/docs/apache-airflow/stable/tutorial/index.html)
-- **Spark**: [PySpark Guide](https://spark.apache.org/docs/latest/api/python/)
-- **Docker**: [Docker Compose Docs](https://docs.docker.com/compose/)
-- **PostgreSQL**: [Tutorial](https://www.postgresql.org/docs/current/tutorial.html)
+### Technology Documentation
+- **Apache Airflow**: [Official Documentation](https://airflow.apache.org/docs/apache-airflow/stable/tutorial/index.html)
+- **Apache Spark**: [PySpark API Reference](https://spark.apache.org/docs/latest/api/python/)
+- **Docker Compose**: [Configuration Reference](https://docs.docker.com/compose/)
+- **PostgreSQL**: [Database Tutorial](https://www.postgresql.org/docs/current/tutorial.html)
 
-### Extending the Pipeline
-- Add more data sources (weather APIs, sensors)
-- Implement machine learning predictions
-- Create data visualization dashboards
-- Add real-time streaming capabilities
-- Export to cloud data warehouses
+### Extension Opportunities
+- Integration of additional meteorological data sources and sensor networks
+- Implementation of predictive analytics and machine learning models
+- Development of real-time data visualization and dashboard interfaces
+- Addition of streaming data processing capabilities for continuous monitoring
+- Export functionality to cloud-based data warehouse solutions
 
-## 🤝 Contributing
+## Contributing
 
-**Found a bug or want to improve something?**
+### Development Process
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes
-4. Test with: `docker-compose up --build`
-5. Submit a pull request
+1. Fork the repository to your GitHub account
+2. Create a feature branch: `git checkout -b feature/descriptive-name`
+3. Implement your modifications with appropriate testing
+4. Validate changes using: `docker-compose up --build`
+5. Submit a pull request with detailed description
 
-**Ideas for contributions:**
-- Additional weather data sources
-- More sophisticated data quality checks
-- Performance optimizations
-- Additional output formats (CSV, JSON)
-- Integration with visualization tools
+### Contribution Areas
+- Integration of additional meteorological data sources
+- Enhancement of data quality validation mechanisms
+- Performance optimization and resource utilization improvements
+- Support for additional data export formats (CSV, JSON, XML)
+- Development of data visualization and dashboard integrations
 
-## 📄 License & Credits
+## License and Attribution
 
-**License**: MIT License - see LICENSE file for details
+**License**: MIT License - refer to LICENSE file for complete terms
 
-**Built with:**
-- 🌤️ OpenWeatherMap API for weather data
-- ⚡ Apache Spark for data processing
-- 🌬️ Apache Airflow for orchestration  
-- 🐘 PostgreSQL for data storage
-- 🐳 Docker for containerization
+**Technology Stack Attribution:**
+- OpenWeatherMap API for meteorological data sourcing
+- Apache Spark for distributed data processing capabilities
+- Apache Airflow for workflow orchestration and scheduling
+- PostgreSQL for relational database management
+- Docker for application containerization and deployment
 
 ---
 
-### ⭐ Quick Commands Reference
+### Command Reference
 
 ```bash
-# Start pipeline
+# Initialize pipeline services
 docker-compose up -d
 
-# Stop pipeline  
+# Terminate pipeline services
 docker-compose down
 
-# View logs
+# Monitor application logs
 docker-compose logs -f
 
-# Rebuild after changes
+# Rebuild containers after modifications
 docker-compose build --no-cache
 
-# Fix permissions
+# Configure file system permissions
 ./fix-permissions.sh
 
-# Connect to database
+# Access database interface
 docker exec -it weather_data_pipeline-postgres-1 psql -U airflow -d weatherdb
 
-# Access Airflow
+# Access web-based monitoring interface
 open http://localhost:8080
 ```
 
-**🎉 That's it! You now have a complete production-ready weather data pipeline!**
+This implementation provides a comprehensive, production-ready weather data processing pipeline suitable for educational and professional applications.
