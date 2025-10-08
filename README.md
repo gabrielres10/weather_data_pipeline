@@ -1,6 +1,6 @@
 # Weather Data Pipeline
 
-A comprehensive ETL (Extract, Transform, Load) pipeline implementation that demonstrates modern data engineering practices. The system extracts me## Troubleshooting and Diagnostics
+A comprehensive ETL (Extract, Transform, Load) pipeline implementation that demonstrates modern data engineering practices.
 
 ### Common Issues and Resolutions
 
