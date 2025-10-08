@@ -1,13 +1,81 @@
 # ignore .env files
 .env
+.env.local
 
 # exclude venv
 venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
 
 # exclude logs
 logs/
+*.log
 
 # exclude generated files
 staging/
+
+# Airflow generated directories and files
+plugins/
+config/airflow.cfg.bak
+airflow.cfg
+webserver_config.py
+standalone_admin_password.txt
+
+# Keep fix-permissions.sh but it's meant to be run manually after docker-compose up
+
+# Docker volumes and generated data
+postgres-db-volume/
+.volumes/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.pytest_cache/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
