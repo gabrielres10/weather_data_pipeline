@@ -16,8 +16,16 @@ A complete data pipeline that extracts weather data from OpenWeatherMap API, pro
 - **Raw data staging**: Stores JSON responses with metadata in staging directory
 - **Error handling**: Graceful handling of API errors, network issues, and validation
 
+### Part 2: Data Processing with Spark ✅
+- **Apache Spark processing**: Scalable data transformation using PySpark
+- **Temperature conversion**: Automatic conversion from Kelvin to Celsius and Fahrenheit
+- **Data quality handling**: Robust filtering of missing or malformed data
+- **Comprehensive transformations**: Extracts city, country, temperature, humidity, pressure, weather description, timestamps
+- **Statistical analysis**: Calculates averages, extremes, and weather condition distributions
+- **Parquet output**: Efficient columnar storage with date partitioning
+- **Detailed reporting**: JSON summaries with comprehensive weather statistics
+
 ### Upcoming Parts
-- **Part 2**: Data Processing with Apache Spark
 - **Part 3**: Data Storage in PostgreSQL
 - **Part 4**: Orchestration with Apache Airflow
 
@@ -25,13 +33,19 @@ A complete data pipeline that extracts weather data from OpenWeatherMap API, pro
 
 ```
 weather_data_pipeline/
-├── extract_weather.py          # Main extraction script
+├── extract_weather.py          # Weather data extraction script
+├── spark_process.py            # Apache Spark processing job
+├── run_full_pipeline.py        # Complete pipeline runner
+├── test_spark_process.py       # Spark processor testing utility
 ├── requirements.txt            # Python dependencies
 ├── .env.example               # Environment variables template
 ├── README.md                  # This file
 ├── db_setup.sql              # Database setup scripts
-├── staging/                   # Raw data storage (auto-created)
-│   └── raw/                  # JSON files from API
+├── staging/                   # Data storage (auto-created)
+│   ├── raw/                  # Raw JSON files from API
+│   └── processed/            # Processed data
+│       ├── weather_parquet/  # Parquet files (date partitioned)
+│       └── summaries/        # Processing summaries (JSON)
 └── logs/                     # Application logs (auto-created)
 ```
 
@@ -39,6 +53,7 @@ weather_data_pipeline/
 
 ### Prerequisites
 - Python 3.8+
+- Java 8+ (required for Apache Spark)
 - OpenWeatherMap API key (free at https://openweathermap.org/api)
 
 ### Installation
@@ -73,41 +88,95 @@ Replace `your_api_key_here` with your actual OpenWeatherMap API key.
 
 ### Usage
 
-**Run the weather extraction**:
+#### Option 1: Run Complete Pipeline
+```bash
+# Run both extraction and processing
+python run_full_pipeline.py
+```
+
+#### Option 2: Run Individual Steps
+
+**Step 1: Extract weather data**:
 ```bash
 python extract_weather.py
 ```
 
-The script will:
+**Step 2: Process with Spark**:
+```bash
+python spark_process.py
+```
+
+**With custom paths**:
+```bash
+python spark_process.py --input staging/raw --output staging/processed --verbose
+```
+
+The pipeline will:
 - ✅ Validate your API key
 - 🌍 Fetch weather data for all 5 cities
 - 💾 Save raw JSON responses to `staging/raw/`
-- 📊 Generate detailed logs in `logs/`
-- 📈 Create an extraction summary
+- ⚡ Process data with Apache Spark
+- 📊 Generate Parquet files with date partitioning
+- 📈 Create detailed processing summaries
+- 📝 Generate comprehensive logs
 
 ## 📊 Output
 
-### Raw Data Files
-- Location: `staging/raw/`
-- Format: `{city_name}_{timestamp}.json`
-- Content: Enhanced JSON with metadata and raw API response
+### Raw Data Files (Part 1)
+- **Location**: `staging/raw/`
+- **Format**: `{city_name}_{timestamp}.json`
+- **Content**: Enhanced JSON with metadata and raw API response
+
+### Processed Data Files (Part 2)
+- **Parquet Files**: `staging/processed/weather_parquet/`
+  - Date-partitioned columnar format
+  - Optimized for analytics queries
+  - Contains: city, country, temperatures (C/F), humidity, pressure, weather description, timestamps
+- **Summary Reports**: `staging/processed/summaries/`
+  - Comprehensive JSON reports with statistics
+  - Temperature analytics (avg, min, max, stddev)
+  - Extreme weather identification
+  - Weather condition distributions
 
 ### Logs
-- Location: `logs/`
-- Format: `extract_weather_{date}.log`
-- Features: Colored console output, detailed file logging
+- **Location**: `logs/`
+- **Format**: `extract_weather_{date}.log`
+- **Features**: Colored console output, detailed file logging
 
 ### Example Output
+
+#### Extraction (Part 1)
 ```
-2024-01-15 10:30:15 [INFO] ============================================================
-2024-01-15 10:30:15 [INFO] Starting weather data extraction process
-2024-01-15 10:30:15 [INFO] ============================================================
+============================================================
+Starting weather data extraction process
+============================================================
 2024-01-15 10:30:15 [INFO] API key configured successfully
 2024-01-15 10:30:15 [INFO] Cities to process: 5
 2024-01-15 10:30:16 [INFO] ✓ Success: New York, US - 15.2°C, clear sky (1.23s)
 2024-01-15 10:30:17 [INFO] ✓ Success: London, GB - 8.1°C, cloudy (0.98s)
 ...
 2024-01-15 10:30:20 [INFO] Success rate: 100.0%
+```
+
+#### Spark Processing (Part 2)
+```
+============================================================
+Starting Spark weather data processing
+============================================================
+Found 6 JSON files to process
+Detected enhanced JSON format with metadata
+Initial records read: 5
+Valid records for processing: 5
+✓ Successfully wrote Parquet files
+
+============================================================
+PROCESSING SUMMARY
+============================================================
+Records processed: 5
+Average temperature: 14.6°C
+Temperature range: 8.1°C to 22.5°C
+Hottest city: Tokyo, JP (22.5°C)
+Coldest city: London, GB (8.1°C)
 ```
 
 ## 🔧 Configuration
@@ -124,29 +193,70 @@ The script will:
 
 ## 🛠️ Technical Details
 
-### Retry Strategy
+### Part 1: Data Extraction
+#### Retry Strategy
 - **Max attempts**: 5
-- **Wait strategy**: Exponential backoff (2s to 30s)
+- **Wait strategy**: Exponential backoff (2s to 30s)  
 - **Retry conditions**: Network errors, API errors, timeouts
 
-### Error Handling
+#### Error Handling
 - ✅ Invalid API key detection
 - ✅ City not found handling
 - ✅ Network timeout management  
 - ✅ Connection error recovery
 - ✅ Graceful failure logging
 
-### Data Validation
+#### Data Validation
 - ✅ Response format validation
 - ✅ Required fields checking
 - ✅ Temperature data verification
 
+### Part 2: Spark Processing
+#### Data Transformations
+- **Temperature conversion**: Smart detection of Kelvin vs Celsius input
+- **Unit standardization**: Converts to both Celsius and Fahrenheit
+- **Field extraction**: City, country, weather metrics, descriptions
+- **Timestamp handling**: Processing and measurement timestamps
+
+#### Data Quality
+- **Missing data handling**: Graceful filtering of incomplete records
+- **Range validation**: Temperature sanity checks (-100°C to 60°C)
+- **Type casting**: Proper data type conversion for all fields
+- **Duplicate handling**: Natural deduplication through processing
+
+#### Output Optimization
+- **Parquet format**: Efficient columnar storage
+- **Date partitioning**: Organized by measurement date
+- **Compression**: Built-in Parquet compression
+- **Schema evolution**: Supports future field additions
+
+#### Performance Features
+- **Adaptive query execution**: Spark 3.x optimizations
+- **Partition coalescing**: Reduces small file problems
+- **Lazy evaluation**: Optimized execution plans
+- **Memory management**: Configurable Spark settings
+
 ## 🧪 Testing
 
-Run a quick test:
+### Test Extraction
 ```bash
-# Test with debug logging
+# Test extraction with debug logging
 LOG_LEVEL=DEBUG python extract_weather.py
+```
+
+### Test Spark Processing
+```bash
+# Test Spark processor with sample data
+python test_spark_process.py
+
+# Test processing with existing data
+python spark_process.py --verbose
+```
+
+### Test Complete Pipeline
+```bash
+# Run full pipeline test
+python run_full_pipeline.py
 ```
 
 ## 📈 Monitoring
